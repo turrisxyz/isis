@@ -108,7 +108,7 @@ public interface SpecificationLoader {
      *
      * @param action
      */
-    void forEach(Consumer<ObjectSpecification> onSpec);
+    void forEach(Consumer<ObjectSpecification> onSpec, final boolean shouldRunConcurrent);
 
     void reloadSpecification(Class<?> domainType);
 
@@ -267,4 +267,5 @@ public interface SpecificationLoader {
                         featureIdentifier));
     }
 
+    boolean isMetamodelFullyIntrospected();
 }
