@@ -11,16 +11,16 @@ import org.apache.isis.core.config.IsisConfiguration;
 import org.apache.isis.core.config.environment.IsisSystemEnvironment;
 import org.apache.isis.core.config.metamodel.specloader.IntrospectionMode;
 import org.apache.isis.core.metamodel.facets.actions.semantics.ActionSemanticsFacet;
+import org.apache.isis.core.metamodel.spec.ObjectSpecification;
 import org.apache.isis.core.metamodel.spec.feature.MixedIn;
 import org.apache.isis.core.metamodel.spec.feature.ObjectAction;
-import org.apache.isis.core.metamodel.spec.feature.ObjectFeature;
 import org.apache.isis.core.metamodel.specloader.SpecificationLoader;
 import org.springframework.graphql.execution.GraphQlSource;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static graphql.schema.FieldCoordinates.coordinates;
@@ -63,19 +63,63 @@ public class GraphQlSourceForIsis implements GraphQlSource {
 
         val queryBuilder = newObject().name("Query");
         val codeRegistryBuilder = GraphQLCodeRegistry.newCodeRegistry();
+        Map<String, GraphQLObjectType.Builder> typeBuilderRegistry = new HashMap<>();
 
 
         specificationLoader.forEach(objectSpecification -> {
 
             val logicalTypeName = objectSpecification.getLogicalTypeName();
+            String logicalTypeNameSanitized = logicalTypeNameSanitized(logicalTypeName);
             val correspondingClass = objectSpecification.getCorrespondingClass();
             switch (objectSpecification.getBeanSort()) {
                 case VIEW_MODEL: // @DomainObject(nature=VIEW_MODEL)
                     // TODO
                     break;
                 case ENTITY:    // @DomainObject(nature=ENTITY)
-                    // TODO
 
+                    final GraphQLObjectType.Builder entityTypeBuilder;
+                    if (typeBuilderRegistry.containsKey(logicalTypeName)){
+                        entityTypeBuilder = typeBuilderRegistry.get(logicalTypeName);
+                    } else {
+                        entityTypeBuilder = newObject().name(logicalTypeNameSanitized);
+                        typeBuilderRegistry.put(logicalTypeName, entityTypeBuilder);
+                    }
+
+                    objectSpecification.streamProperties(MixedIn.INCLUDED)
+                                    .forEach(otoa->{
+                                        ObjectSpecification fieldObjectSpecification = otoa.getElementType();
+                                        switch (fieldObjectSpecification.getBeanSort()){
+
+                                            case ENTITY:
+
+                                                String logicalTypeNameOfField = fieldObjectSpecification.getLogicalTypeName();
+                                                // register typebuilder for entity if not already
+                                                GraphQLObjectType.Builder fieldTypeBuilder;
+                                                if (typeBuilderRegistry.containsKey(logicalTypeNameOfField)){
+                                                    fieldTypeBuilder = typeBuilderRegistry.get(logicalTypeNameOfField);
+                                                } else {
+                                                    fieldTypeBuilder = typeBuilderRegistry.put(logicalTypeNameOfField, newObject().name(logicalTypeNameSanitized(logicalTypeNameOfField)));
+                                                }
+                                                entityTypeBuilder.field(newFieldDefinition().name(otoa.getId()).type(fieldTypeBuilder).build());
+
+                                                break;
+
+                                            case VALUE:
+
+                                                entityTypeBuilder.field(newFieldDefinition().name(otoa.getId()).type(Scalars.GraphQLString).build());
+
+                                                break;
+
+
+                                        }
+                                    });
+
+
+                    serviceRegistry.lookupBeanById(logicalTypeName).ifPresent(service -> {
+
+
+
+                    });
 
                     break;
                 case MANAGED_BEAN_CONTRIBUTING: //@DomainService
@@ -90,8 +134,6 @@ public class GraphQlSourceForIsis implements GraphQlSource {
 
                                 // for now filters when no safe actions
                                 if (!objectActionList.isEmpty()) {
-
-                                    String logicalTypeNameSanitized = logicalTypeName.replace('.', '_');
 
                                     val serviceAsGraphQlType = newObject().name(logicalTypeNameSanitized);
 
@@ -182,10 +224,20 @@ public class GraphQlSourceForIsis implements GraphQlSource {
                         (DataFetcher<Object>) environment -> this.serviceRegistry.streamRegisteredBeans().count())
                 .build();
 
+        Set<GraphQLType> entityTypes = new HashSet<>();
+        typeBuilderRegistry.forEach((k,v)->{
+            entityTypes.add(v.build());
+        });
+
         return GraphQLSchema.newSchema()
                 .query(query)
+                .additionalTypes(entityTypes)
                 .codeRegistry(codeRegistry)
                 .build();
+    }
+
+    public static String logicalTypeNameSanitized(final String logicalTypeName){
+        return logicalTypeName.replace('.', '_');
     }
 
 }
