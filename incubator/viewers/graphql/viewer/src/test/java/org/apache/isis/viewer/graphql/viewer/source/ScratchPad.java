@@ -7,6 +7,7 @@ import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.validation.InvalidSchemaException;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -176,6 +177,45 @@ class ScratchPad {
         });
         Assertions.assertEquals("invalid schema:\n" +
                 "\"e2\" must define one or more fields.", exception.getMessage());
+
+
+    }
+
+    @Test()
+    @Disabled("Produces stack overflow")
+    public void nested_builders_work_with_caching_object_type_builder2_produces_stackoverflow() {
+
+        // given
+        GraphQLObjectType query = getQuery();
+
+        final Map<String, GraphQLObjectType.Builder> typeBuilderRegistry = new HashMap<>();
+
+        // registering builder for e1 referencing e2
+        CachingGraphQLObjectTypeBuilder2 eb1_referencing_e2 = (CachingGraphQLObjectTypeBuilder2) new CachingGraphQLObjectTypeBuilder2().name("e1");
+        // we encounter e2, so we register a builder for e2
+        CachingGraphQLObjectTypeBuilder2 eb2_referencing_e1 = (CachingGraphQLObjectTypeBuilder2) new CachingGraphQLObjectTypeBuilder2().name("e2");
+        typeBuilderRegistry.put("e2", eb2_referencing_e1);
+
+        // we put the buider for e2 in the field def and register the field def
+        OurGraphQLFieldDefinitionBuilder2 e1f1 = (OurGraphQLFieldDefinitionBuilder2) new OurGraphQLFieldDefinitionBuilder2().name("e1f1").type(typeBuilderRegistry.get("e2"));
+        eb1_referencing_e2.field(e1f1);
+        typeBuilderRegistry.put("e1", eb1_referencing_e2);
+
+        // we now build the rest of e2 referencing e1 (circular reference)
+        OurGraphQLFieldDefinitionBuilder2 e2f1 = (OurGraphQLFieldDefinitionBuilder2) new OurGraphQLFieldDefinitionBuilder2().name("e2f1").type(typeBuilderRegistry.get("e1"));
+        eb2_referencing_e1.field(e2f1);
+
+        // when
+        Set<GraphQLType> entityTypes = new HashSet<>();
+        typeBuilderRegistry.forEach((k, b) -> entityTypes.add(b.build()));
+
+        // then
+
+
+        GraphQLSchema schema = GraphQLSchema.newSchema()
+                .query(query)
+                .additionalTypes(entityTypes)
+                .build();
 
 
     }
