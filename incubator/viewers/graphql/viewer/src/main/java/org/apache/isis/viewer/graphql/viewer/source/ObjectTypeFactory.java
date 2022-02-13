@@ -14,7 +14,6 @@ import org.apache.isis.core.metamodel.specloader.SpecificationLoader;
 import org.springframework.stereotype.Component;
 
 import javax.inject.Inject;
-import java.util.Optional;
 import java.util.Set;
 
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
@@ -27,14 +26,40 @@ public class ObjectTypeFactory {
     private final BookmarkService bookmarkService;
     private final SpecificationLoader specificationLoader;
 
+    private static GraphQLFieldDefinition idField = newFieldDefinition().name("id").type(Scalars.GraphQLString).build();
+    private static GraphQLFieldDefinition logicalTypeNameField = newFieldDefinition().name("logicalTypeName").type(Scalars.GraphQLString).build();
+    private static GraphQLFieldDefinition versionField = newFieldDefinition().name("version").type(Scalars.GraphQLString).build();
+
     public void objectTypeFromObjectSpecification(final ObjectSpecification objectSpecification, final Set<GraphQLType> graphQLObjectTypes, final GraphQLCodeRegistry.Builder codeRegistryBuilder) {
 
         val logicalTypeName = objectSpecification.getLogicalTypeName();
         String logicalTypeNameSanitized = logicalTypeNameSanitized(logicalTypeName);
 
-
         GraphQLObjectType.Builder objectTypeBuilder = newObject().name(logicalTypeNameSanitized);
 
+        // create meta field type
+        BeanSort objectSpecificationBeanSort = objectSpecification.getBeanSort();
+        GraphQLObjectType metaType = createAndRegisterMetaType(logicalTypeNameSanitized, objectSpecificationBeanSort, graphQLObjectTypes);
+
+        // add meta field
+        GraphQLFieldDefinition gql_meta = newFieldDefinition().name("_gql_meta").type(metaType).build();
+        objectTypeBuilder.field(gql_meta);
+
+        // add fields
+        addFields(objectSpecification, objectTypeBuilder);
+
+        // build and register object type
+        GraphQLObjectType graphQLObjectType = objectTypeBuilder.build();
+        graphQLObjectTypes.add(graphQLObjectType);
+
+        // create and register data fetchers
+        createAndRegisterDataFetchersForMetaData(codeRegistryBuilder, objectSpecificationBeanSort, metaType, gql_meta, graphQLObjectType);
+        createAndRegisterDataFetchers(objectSpecification, codeRegistryBuilder, graphQLObjectType);
+
+        return;
+    }
+
+    void addFields(ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder) {
         objectSpecification.streamProperties(MixedIn.INCLUDED)
                 .forEach(otoa -> {
 
@@ -62,31 +87,9 @@ public class ObjectTypeFactory {
 
                     }
                 });
+    }
 
-
-        // create meta type
-
-        BeanSort objectSpecificationBeanSort = objectSpecification.getBeanSort();
-        String metaTypeName = logicalTypeNameSanitized + "__DomainObject_meta";
-        GraphQLObjectType.Builder metaTypeBuilder = newObject().name(metaTypeName);
-        GraphQLFieldDefinition idField = newFieldDefinition().name("id").type(Scalars.GraphQLString).build();
-        metaTypeBuilder.field(idField);
-        GraphQLFieldDefinition logicalTypeNameField = newFieldDefinition().name("logicalTypeName").type(Scalars.GraphQLString).build();
-        metaTypeBuilder.field(logicalTypeNameField);
-
-        GraphQLFieldDefinition versionField = null;
-        if (objectSpecificationBeanSort == BeanSort.ENTITY) {
-            versionField = newFieldDefinition().name("version").type(Scalars.GraphQLString).build();
-            metaTypeBuilder.field(versionField);
-        }
-        GraphQLObjectType metaType = metaTypeBuilder.build();
-        graphQLObjectTypes.add(metaType);
-
-        GraphQLFieldDefinition gql_meta = newFieldDefinition().name("_gql_meta").type(metaType).build();
-        objectTypeBuilder.field(gql_meta);
-        GraphQLObjectType graphQLObjectType = objectTypeBuilder.build();
-        graphQLObjectTypes.add(graphQLObjectType);
-
+    void createAndRegisterDataFetchers(ObjectSpecification objectSpecification, GraphQLCodeRegistry.Builder codeRegistryBuilder, GraphQLObjectType graphQLObjectType) {
         objectSpecification.streamProperties(MixedIn.INCLUDED)
                 .forEach(otoa -> {
 
@@ -128,7 +131,22 @@ public class ObjectTypeFactory {
 
                     }
                 });
+    }
 
+    GraphQLObjectType createAndRegisterMetaType(final String logicalTypeNameSanitized, final BeanSort objectSpecificationBeanSort, final Set<GraphQLType> graphQLObjectTypes){
+        String metaTypeName = metaTypeName(logicalTypeNameSanitized);
+        GraphQLObjectType.Builder metaTypeBuilder = newObject().name(metaTypeName);
+        metaTypeBuilder.field(idField);
+        metaTypeBuilder.field(logicalTypeNameField);
+        if (objectSpecificationBeanSort == BeanSort.ENTITY) {
+            metaTypeBuilder.field(versionField);
+        }
+        GraphQLObjectType metaType = metaTypeBuilder.build();
+        graphQLObjectTypes.add(metaType);
+        return metaType;
+    }
+
+    void createAndRegisterDataFetchersForMetaData(GraphQLCodeRegistry.Builder codeRegistryBuilder, BeanSort objectSpecificationBeanSort, GraphQLObjectType metaType, GraphQLFieldDefinition gql_meta, GraphQLObjectType graphQLObjectType) {
         codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(graphQLObjectType, gql_meta), new DataFetcher<Object>(){
             @Override
             public Object get(DataFetchingEnvironment environment) throws Exception {
@@ -171,11 +189,14 @@ public class ObjectTypeFactory {
             });
 
         }
+    }
 
-        return;
+    public static String metaTypeName(final String logicalTypeNameSanitized){
+        return logicalTypeNameSanitized + "__DomainObject_meta";
     }
 
     public static String logicalTypeNameSanitized(final String logicalTypeName) {
         return logicalTypeName.replace('.', '_');
     }
+
 }
