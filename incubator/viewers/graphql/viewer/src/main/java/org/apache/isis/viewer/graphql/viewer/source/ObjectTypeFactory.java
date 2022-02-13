@@ -48,6 +48,9 @@ public class ObjectTypeFactory {
         // add fields
         addFields(objectSpecification, objectTypeBuilder);
 
+        // add collections
+        addCollections(objectSpecification, objectTypeBuilder);
+
         // build and register object type
         GraphQLObjectType graphQLObjectType = objectTypeBuilder.build();
         graphQLObjectTypes.add(graphQLObjectType);
@@ -87,6 +90,37 @@ public class ObjectTypeFactory {
 
                     }
                 });
+    }
+
+    void addCollections(ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder){
+
+        objectSpecification.streamCollections(MixedIn.INCLUDED).forEach(otom ->{
+
+            ObjectSpecification elementType = otom.getElementType();
+            BeanSort beanSort = elementType.getBeanSort();
+            switch (beanSort) {
+
+                case VIEW_MODEL:
+                case ENTITY:
+
+                    String logicalTypeNameOfField = elementType.getLogicalTypeName();
+                    GraphQLFieldDefinition.Builder fieldBuilder = newFieldDefinition().name(otom.getId()).type(GraphQLList.list(GraphQLTypeReference.typeRef(logicalTypeNameSanitized(logicalTypeNameOfField))));
+                    objectTypeBuilder.field(fieldBuilder);
+
+                    break;
+
+                case VALUE:
+
+                    // todo: map ...
+                    GraphQLFieldDefinition.Builder valueBuilder = newFieldDefinition().name(otom.getId()).type(GraphQLList.list(TypeMapper.typeFor(elementType.getCorrespondingClass())));
+                    objectTypeBuilder.field(valueBuilder);
+
+                    break;
+
+            }
+
+        });
+
     }
 
     void createAndRegisterDataFetchers(ObjectSpecification objectSpecification, GraphQLCodeRegistry.Builder codeRegistryBuilder, GraphQLObjectType graphQLObjectType) {

@@ -1,6 +1,7 @@
 package org.apache.isis.viewer.graphql.viewer.source;
 
 import graphql.GraphQL;
+import graphql.Scalars;
 import graphql.schema.*;
 import org.apache.isis.core.config.environment.IsisSystemEnvironment;
 import org.apache.isis.core.config.presets.IsisPresets;
@@ -82,6 +83,34 @@ public class GQLSchema_IntegTest {
         GraphQLType gqltestdomain_e1 = graphQLSchema.getType("gqltestdomain_E1");
         List<GraphQLSchemaElement> children = gqltestdomain_e1.getChildren();
         assertEquals(5, children.size());
+
+        GraphQLObjectType gqltestdomain_e2 = (GraphQLObjectType) graphQLSchema.getType("gqltestdomain_E2");
+        List<GraphQLFieldDefinition> fields = gqltestdomain_e2.getFields();
+        assertEquals(8, fields.size());
+
+        GraphQLFieldDefinition f6 = fields.get(5);
+        assertEquals("otherE2List", f6.getName());
+        Class<? extends GraphQLOutputType> f6TypeClass = f6.getType().getClass();
+        assertEquals(GraphQLList.class, f6TypeClass);
+        GraphQLList list = (GraphQLList) f6.getType();
+        GraphQLTypeReference originalWrappedType = (GraphQLTypeReference) list.getOriginalWrappedType();
+        assertEquals(originalWrappedType.getName(), gqltestdomain_e2.getName());
+
+        GraphQLFieldDefinition f7 = fields.get(6);
+        assertEquals("stringList", f7.getName());
+        Class<? extends GraphQLOutputType> f7TypeClass = f7.getType().getClass();
+        assertEquals(GraphQLList.class, f7TypeClass);
+        GraphQLList list2 = (GraphQLList) f7.getType();
+        GraphQLScalarType originalWrappedType2 = (GraphQLScalarType) list2.getOriginalWrappedType();
+        assertEquals(Scalars.GraphQLString, originalWrappedType2);
+
+        GraphQLFieldDefinition f8 = fields.get(7);
+        assertEquals("zintList", f8.getName());
+        Class<? extends GraphQLOutputType> f8TypeClass = f8.getType().getClass();
+        assertEquals(GraphQLList.class, f8TypeClass);
+        GraphQLList list3 = (GraphQLList) f8.getType();
+        GraphQLScalarType originalWrappedType3 = (GraphQLScalarType) list3.getOriginalWrappedType();
+        assertEquals(Scalars.GraphQLInt, originalWrappedType3);
 
         GraphQLType gqltestdomain_e1__domainObject_meta = graphQLSchema.getType("gqltestdomain_E1__DomainObject_meta");
         List<GraphQLSchemaElement> children1 = gqltestdomain_e1__domainObject_meta.getChildren();

@@ -3,12 +3,20 @@ package org.apache.isis.viewer.graphql.viewer.source;
 import graphql.Scalars;
 import graphql.schema.GraphQLInputType;
 import graphql.schema.GraphQLOutputType;
+import graphql.schema.GraphQLType;
 import org.apache.isis.core.metamodel.facetapi.FeatureType;
 import org.apache.isis.core.metamodel.spec.ObjectSpecification;
 import org.apache.isis.core.metamodel.spec.feature.ObjectAction;
 import org.apache.isis.core.metamodel.spec.feature.ObjectActionParameter;
 
 public class TypeMapper {
+
+    public static GraphQLType typeFor(final Class c){
+        if (c.equals(Integer.class)){
+            return Scalars.GraphQLInt;
+        }
+        return Scalars.GraphQLString;
+    }
 
     public static GraphQLInputType inputTypeFor(final ObjectActionParameter objectActionParameter){
         ObjectSpecification elementType = objectActionParameter.getElementType();
