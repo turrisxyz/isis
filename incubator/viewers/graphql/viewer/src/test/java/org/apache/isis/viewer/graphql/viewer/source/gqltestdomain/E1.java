@@ -27,7 +27,7 @@ public class E1 implements TestEntity, Comparable {
 
     @Getter @Setter
     @Property
-    @ManyToOne(optional = true)
+    @OneToOne(optional = true)
     @JoinColumn(name = "e2_id")
     private E2 e2;
 

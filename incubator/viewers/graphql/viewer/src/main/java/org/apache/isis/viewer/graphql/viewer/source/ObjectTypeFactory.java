@@ -7,9 +7,11 @@ import lombok.val;
 import org.apache.isis.applib.services.bookmark.Bookmark;
 import org.apache.isis.applib.services.bookmark.BookmarkService;
 import org.apache.isis.applib.services.metamodel.BeanSort;
+import org.apache.isis.core.metamodel.spec.ActionScope;
 import org.apache.isis.core.metamodel.spec.ManagedObject;
 import org.apache.isis.core.metamodel.spec.ObjectSpecification;
 import org.apache.isis.core.metamodel.spec.feature.MixedIn;
+import org.apache.isis.core.metamodel.spec.feature.ObjectAssociation;
 import org.apache.isis.core.metamodel.specloader.SpecificationLoader;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +20,7 @@ import java.util.Set;
 
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 import static graphql.schema.GraphQLObjectType.newObject;
+import static org.apache.isis.viewer.graphql.viewer.source.Utils.metaTypeName;
 
 @Component
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
@@ -33,7 +36,7 @@ public class ObjectTypeFactory {
     public void objectTypeFromObjectSpecification(final ObjectSpecification objectSpecification, final Set<GraphQLType> graphQLObjectTypes, final GraphQLCodeRegistry.Builder codeRegistryBuilder) {
 
         val logicalTypeName = objectSpecification.getLogicalTypeName();
-        String logicalTypeNameSanitized = logicalTypeNameSanitized(logicalTypeName);
+        String logicalTypeNameSanitized = Utils.logicalTypeNameSanitized(logicalTypeName);
 
         GraphQLObjectType.Builder objectTypeBuilder = newObject().name(logicalTypeNameSanitized);
 
@@ -57,7 +60,8 @@ public class ObjectTypeFactory {
 
         // create and register data fetchers
         createAndRegisterDataFetchersForMetaData(codeRegistryBuilder, objectSpecificationBeanSort, metaType, gql_meta, graphQLObjectType);
-        createAndRegisterDataFetchers(objectSpecification, codeRegistryBuilder, graphQLObjectType);
+        createAndRegisterDataFetchersForField(objectSpecification, codeRegistryBuilder, graphQLObjectType);
+        createAndRegisterDataFetchersForCollection(objectSpecification, codeRegistryBuilder, graphQLObjectType);
 
         return;
     }
@@ -75,7 +79,7 @@ public class ObjectTypeFactory {
 
                             String logicalTypeNameOfField = fieldObjectSpecification.getLogicalTypeName();
 
-                            GraphQLFieldDefinition.Builder fieldBuilder = newFieldDefinition().name(otoa.getId()).type(GraphQLTypeReference.typeRef(logicalTypeNameSanitized(logicalTypeNameOfField)));
+                            GraphQLFieldDefinition.Builder fieldBuilder = newFieldDefinition().name(otoa.getId()).type(GraphQLTypeReference.typeRef(Utils.logicalTypeNameSanitized(logicalTypeNameOfField)));
                             objectTypeBuilder.field(fieldBuilder);
 
                             break;
@@ -92,6 +96,15 @@ public class ObjectTypeFactory {
                 });
     }
 
+    void createAndRegisterDataFetchersForField(ObjectSpecification objectSpecification, GraphQLCodeRegistry.Builder codeRegistryBuilder, GraphQLObjectType graphQLObjectType) {
+        objectSpecification.streamProperties(MixedIn.INCLUDED)
+                .forEach(otoa -> {
+
+                    createAndRegisterDataFetcherForObjectAssociation(codeRegistryBuilder, graphQLObjectType, otoa);
+
+                });
+    }
+
     void addCollections(ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder){
 
         objectSpecification.streamCollections(MixedIn.INCLUDED).forEach(otom ->{
@@ -104,14 +117,13 @@ public class ObjectTypeFactory {
                 case ENTITY:
 
                     String logicalTypeNameOfField = elementType.getLogicalTypeName();
-                    GraphQLFieldDefinition.Builder fieldBuilder = newFieldDefinition().name(otom.getId()).type(GraphQLList.list(GraphQLTypeReference.typeRef(logicalTypeNameSanitized(logicalTypeNameOfField))));
+                    GraphQLFieldDefinition.Builder fieldBuilder = newFieldDefinition().name(otom.getId()).type(GraphQLList.list(GraphQLTypeReference.typeRef(Utils.logicalTypeNameSanitized(logicalTypeNameOfField))));
                     objectTypeBuilder.field(fieldBuilder);
 
                     break;
 
                 case VALUE:
 
-                    // todo: map ...
                     GraphQLFieldDefinition.Builder valueBuilder = newFieldDefinition().name(otom.getId()).type(GraphQLList.list(TypeMapper.typeFor(elementType.getCorrespondingClass())));
                     objectTypeBuilder.field(valueBuilder);
 
@@ -123,49 +135,61 @@ public class ObjectTypeFactory {
 
     }
 
-    void createAndRegisterDataFetchers(ObjectSpecification objectSpecification, GraphQLCodeRegistry.Builder codeRegistryBuilder, GraphQLObjectType graphQLObjectType) {
-        objectSpecification.streamProperties(MixedIn.INCLUDED)
-                .forEach(otoa -> {
+    void createAndRegisterDataFetchersForCollection(ObjectSpecification objectSpecification, GraphQLCodeRegistry.Builder codeRegistryBuilder, GraphQLObjectType graphQLObjectType) {
 
-                    ObjectSpecification fieldObjectSpecification = otoa.getElementType();
-                    BeanSort beanSort = fieldObjectSpecification.getBeanSort();
-                    switch (beanSort) {
-
-                        case VIEW_MODEL:
-                        case ENTITY:
-
-                            codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(graphQLObjectType, otoa.getId()), new DataFetcher<Object>() {
-
-                                @Override
-                                public Object get(DataFetchingEnvironment environment) throws Exception {
-
-                                    Object domainObjectInstance = environment.getSource();
-
-                                    Class<?> domainObjectInstanceClass = domainObjectInstance.getClass();
-                                    ObjectSpecification specification = specificationLoader.loadSpecification(domainObjectInstanceClass);
-
-                                    ManagedObject owner = ManagedObject.of(specification, domainObjectInstance);
-
-                                    ManagedObject managedObject = otoa.get(owner);
-
-                                    return managedObject.getPojo();
-
-                                }
-
-                            });
-
-
-                            break;
-
-                        case VALUE:
-
-
-
-                            break;
-
-                    }
+        objectSpecification.streamCollections(MixedIn.INCLUDED)
+                .forEach(otom -> {
+                    createAndRegisterDataFetcherForObjectAssociation(codeRegistryBuilder, graphQLObjectType, otom);
                 });
     }
+
+    void addActions(ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder){
+
+        objectSpecification.streamActions(ActionScope.PRODUCTION, MixedIn.INCLUDED)
+                .forEach(objectAction -> {
+
+                    if (objectAction.getSemantics().isSafeInNature()){
+
+
+
+                    }
+
+        });
+
+    }
+
+    private void createAndRegisterDataFetcherForObjectAssociation(GraphQLCodeRegistry.Builder codeRegistryBuilder, GraphQLObjectType graphQLObjectType, ObjectAssociation otom) {
+        ObjectSpecification fieldObjectSpecification = otom.getElementType();
+        BeanSort beanSort = fieldObjectSpecification.getBeanSort();
+        switch (beanSort) {
+
+            case VALUE: //TODO: does this work for values as well?
+
+            case VIEW_MODEL:
+
+            case ENTITY:
+
+                codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(graphQLObjectType, otom.getId()), (DataFetcher<Object>) environment -> {
+
+                    Object domainObjectInstance = environment.getSource();
+
+                    Class<?> domainObjectInstanceClass = domainObjectInstance.getClass();
+                    ObjectSpecification specification = specificationLoader.loadSpecification(domainObjectInstanceClass);
+
+                    ManagedObject owner = ManagedObject.of(specification, domainObjectInstance);
+
+                    ManagedObject managedObject = otom.get(owner);
+
+                    return managedObject.getPojo();
+
+                });
+
+
+                break;
+
+        }
+    }
+
 
     GraphQLObjectType createAndRegisterMetaType(final String logicalTypeNameSanitized, final BeanSort objectSpecificationBeanSort, final Set<GraphQLType> graphQLObjectTypes){
         String metaTypeName = metaTypeName(logicalTypeNameSanitized);
@@ -223,14 +247,6 @@ public class ObjectTypeFactory {
             });
 
         }
-    }
-
-    public static String metaTypeName(final String logicalTypeNameSanitized){
-        return logicalTypeNameSanitized + "__DomainObject_meta";
-    }
-
-    public static String logicalTypeNameSanitized(final String logicalTypeName) {
-        return logicalTypeName.replace('.', '_');
     }
 
 }

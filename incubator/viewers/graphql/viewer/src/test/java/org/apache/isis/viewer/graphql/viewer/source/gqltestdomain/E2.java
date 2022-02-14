@@ -28,7 +28,7 @@ public class E2 implements TestEntity{
 
     @Getter @Setter
     @Property
-    @ManyToOne(optional = true)
+    @OneToOne(optional = true)
     @JoinColumn(name = "e1_id")
     private E1 e1;
 
