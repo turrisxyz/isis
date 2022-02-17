@@ -16,11 +16,15 @@ import org.apache.isis.core.metamodel.specloader.SpecificationLoader;
 import org.springframework.stereotype.Component;
 
 import javax.inject.Inject;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 import static graphql.schema.GraphQLObjectType.newObject;
 import static org.apache.isis.viewer.graphql.viewer.source.Utils.metaTypeName;
+import static org.apache.isis.viewer.graphql.viewer.source.Utils.mutatorsTypeName;
 
 @Component
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
@@ -53,6 +57,9 @@ public class ObjectTypeFactory {
 
         // add collections
         addCollections(objectSpecification, objectTypeBuilder);
+
+        // add actions
+        addActions(logicalTypeNameSanitized, objectSpecification, objectTypeBuilder, graphQLObjectTypes);
 
         // build and register object type
         GraphQLObjectType graphQLObjectType = objectTypeBuilder.build();
@@ -105,9 +112,9 @@ public class ObjectTypeFactory {
                 });
     }
 
-    void addCollections(ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder){
+    void addCollections(ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder) {
 
-        objectSpecification.streamCollections(MixedIn.INCLUDED).forEach(otom ->{
+        objectSpecification.streamCollections(MixedIn.INCLUDED).forEach(otom -> {
 
             ObjectSpecification elementType = otom.getElementType();
             BeanSort beanSort = elementType.getBeanSort();
@@ -143,18 +150,59 @@ public class ObjectTypeFactory {
                 });
     }
 
-    void addActions(ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder){
+    void addActions(String logicalTypeNameSanitized, ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder, final Set<GraphQLType> graphQLObjectTypes) {
+
+        String mutatorsTypeName = mutatorsTypeName(logicalTypeNameSanitized);
+        GraphQLObjectType.Builder mutatorsTypeBuilder = newObject().name(mutatorsTypeName);
+        final List<String> mutatorFieldNames = new ArrayList<>();
 
         objectSpecification.streamActions(ActionScope.PRODUCTION, MixedIn.INCLUDED)
                 .forEach(objectAction -> {
 
-                    if (objectAction.getSemantics().isSafeInNature()){
+                    if (objectAction.getSemantics().isSafeInNature()) {
 
+                        String fieldName = objectAction.getId();
+                        GraphQLFieldDefinition.Builder builder = newFieldDefinition()
+                                .name(fieldName)
+                                .type((GraphQLOutputType) TypeMapper.typeForObjectAction(objectAction));
+                        if (objectAction.getParameters().isNotEmpty()) {
+                            builder.arguments(objectAction.getParameters().stream()
+                                    .map(objectActionParameter -> GraphQLArgument.newArgument()
+                                            .name(objectActionParameter.getId())
+                                            .type(TypeMapper.inputTypeFor(objectActionParameter))
+                                            .build())
+                                    .collect(Collectors.toList()));
+                        }
+                        objectTypeBuilder.field(builder);
 
+                    } else {
+
+                        String fieldName = objectAction.getId();
+                        GraphQLFieldDefinition.Builder builder = newFieldDefinition()
+                                .name(fieldName)
+                                .type((GraphQLOutputType) TypeMapper.typeForObjectAction(objectAction));
+                        if (objectAction.getParameters().isNotEmpty()) {
+                            builder.arguments(objectAction.getParameters().stream()
+                                    .map(objectActionParameter -> GraphQLArgument.newArgument()
+                                            .name(objectActionParameter.getId())
+                                            .type(TypeMapper.inputTypeFor(objectActionParameter))
+                                            .build())
+                                    .collect(Collectors.toList()));
+                        }
+
+                        mutatorsTypeBuilder.field(builder);
+                        mutatorFieldNames.add(fieldName);
 
                     }
 
-        });
+
+                });
+
+        if (!mutatorFieldNames.isEmpty()){
+            GraphQLObjectType mutatorsType = mutatorsTypeBuilder.build();
+            graphQLObjectTypes.add(mutatorsType);
+            objectTypeBuilder.field(newFieldDefinition().name("_gql_mutators").type(mutatorsType).build());
+        }
 
     }
 
@@ -191,7 +239,7 @@ public class ObjectTypeFactory {
     }
 
 
-    GraphQLObjectType createAndRegisterMetaType(final String logicalTypeNameSanitized, final BeanSort objectSpecificationBeanSort, final Set<GraphQLType> graphQLObjectTypes){
+    GraphQLObjectType createAndRegisterMetaType(final String logicalTypeNameSanitized, final BeanSort objectSpecificationBeanSort, final Set<GraphQLType> graphQLObjectTypes) {
         String metaTypeName = metaTypeName(logicalTypeNameSanitized);
         GraphQLObjectType.Builder metaTypeBuilder = newObject().name(metaTypeName);
         metaTypeBuilder.field(idField);
@@ -204,8 +252,17 @@ public class ObjectTypeFactory {
         return metaType;
     }
 
+    GraphQLObjectType createAndRegisterMutatorsType(final String logicalTypeNameSanitized, final BeanSort objectSpecificationBeanSort, final Set<GraphQLType> graphQLObjectTypes) {
+        //TODO: this is not going to work, because we need to dynamically add fields
+        String mutatorsTypeName = mutatorsTypeName(logicalTypeNameSanitized);
+        GraphQLObjectType.Builder mutatorsTypeBuilder = newObject().name(mutatorsTypeName);
+        GraphQLObjectType mutatorsType = mutatorsTypeBuilder.build();
+        graphQLObjectTypes.add(mutatorsType);
+        return mutatorsType;
+    }
+
     void createAndRegisterDataFetchersForMetaData(GraphQLCodeRegistry.Builder codeRegistryBuilder, BeanSort objectSpecificationBeanSort, GraphQLObjectType metaType, GraphQLFieldDefinition gql_meta, GraphQLObjectType graphQLObjectType) {
-        codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(graphQLObjectType, gql_meta), new DataFetcher<Object>(){
+        codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(graphQLObjectType, gql_meta), new DataFetcher<Object>() {
             @Override
             public Object get(DataFetchingEnvironment environment) throws Exception {
 
@@ -215,7 +272,7 @@ public class ObjectTypeFactory {
             }
         });
 
-        codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(metaType, idField), new DataFetcher<Object>(){
+        codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(metaType, idField), new DataFetcher<Object>() {
             @Override
             public Object get(DataFetchingEnvironment environment) throws Exception {
 
@@ -225,7 +282,7 @@ public class ObjectTypeFactory {
             }
         });
 
-        codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(metaType, logicalTypeNameField), new DataFetcher<Object>(){
+        codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(metaType, logicalTypeNameField), new DataFetcher<Object>() {
             @Override
             public Object get(DataFetchingEnvironment environment) throws Exception {
 
@@ -235,8 +292,8 @@ public class ObjectTypeFactory {
             }
         });
 
-        if (objectSpecificationBeanSort == BeanSort.ENTITY){
-            codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(metaType, versionField), new DataFetcher<Object>(){
+        if (objectSpecificationBeanSort == BeanSort.ENTITY) {
+            codeRegistryBuilder.dataFetcher(FieldCoordinates.coordinates(metaType, versionField), new DataFetcher<Object>() {
                 @Override
                 public Object get(DataFetchingEnvironment environment) throws Exception {
 

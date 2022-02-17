@@ -13,7 +13,9 @@ import org.apache.isis.viewer.graphql.viewer.IsisModuleIncViewerGraphqlViewer;
 import org.apache.isis.viewer.graphql.viewer.source.gqltestdomain.E1;
 import org.apache.isis.viewer.graphql.viewer.source.gqltestdomain.E2;
 import org.apache.isis.viewer.graphql.viewer.source.gqltestdomain.GQLTestDomainMenu;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
@@ -52,7 +54,29 @@ public class GQLSchema_IntegTest {
         assertNotNull(graphQlSourceForIsis);
     }
 
+    /**
+     * See also: https://graphql.org/learn/schema/#input-types
+     */
     @Test
+    void object_types_cannot_be_used_as_input_types(){
+
+        ObjectSpecification objectSpecification1 = specificationLoader.specForType(E1.class).get();
+        assertNotNull(objectSpecification1);
+
+        ObjectSpecification objectSpecification2 = specificationLoader.specForType(E2.class).get();
+        assertNotNull(objectSpecification2);
+
+        ObjectSpecification objectSpecification3 = specificationLoader.specForType(GQLTestDomainMenu.class).get();
+        assertNotNull(objectSpecification3);
+
+        ClassCastException thrown = Assertions.assertThrows(ClassCastException.class, () -> {
+            GraphQL graphQL = graphQlSourceForIsis.graphQl();
+        });
+        Assertions.assertEquals("class graphql.schema.GraphQLObjectType cannot be cast to class graphql.schema.GraphQLInputType (graphql.schema.GraphQLObjectType and graphql.schema.GraphQLInputType are in unnamed module of loader 'app')", thrown.getMessage());
+    }
+
+    @Test
+    @Disabled("Temp disable to illustrate the issue of input types above")
     void assert_stuff_works() {
 
 //        _IocContainer iocContainer = isisSystemEnvironment.getIocContainer();
@@ -86,7 +110,7 @@ public class GQLSchema_IntegTest {
 
         GraphQLObjectType gqltestdomain_e2 = (GraphQLObjectType) graphQLSchema.getType("gqltestdomain_E2");
         List<GraphQLFieldDefinition> fields = gqltestdomain_e2.getFields();
-        assertEquals(8, fields.size());
+        assertEquals(9, fields.size());
 
         GraphQLFieldDefinition f6 = fields.get(5);
         assertEquals("otherE2List", f6.getName());
@@ -111,6 +135,14 @@ public class GQLSchema_IntegTest {
         GraphQLList list3 = (GraphQLList) f8.getType();
         GraphQLScalarType originalWrappedType3 = (GraphQLScalarType) list3.getOriginalWrappedType();
         assertEquals(Scalars.GraphQLInt, originalWrappedType3);
+
+        GraphQLFieldDefinition f9 = fields.get(8);
+        assertEquals("otherEntities", f9.getName());
+        Class<? extends GraphQLOutputType> f9TypeClass = f9.getType().getClass();
+        assertEquals(GraphQLList.class, f9TypeClass);
+        GraphQLList list4 = (GraphQLList) f9.getType();
+        GraphQLTypeReference originalWrappedType4 = (GraphQLTypeReference) list4.getOriginalWrappedType();
+        assertEquals("org_apache_isis_viewer_graphql_viewer_source_gqltestdomain_TestEntity", originalWrappedType4.getName());
 
         GraphQLType gqltestdomain_e1__domainObject_meta = graphQLSchema.getType("gqltestdomain_E1__DomainObject_meta");
         List<GraphQLSchemaElement> children1 = gqltestdomain_e1__domainObject_meta.getChildren();

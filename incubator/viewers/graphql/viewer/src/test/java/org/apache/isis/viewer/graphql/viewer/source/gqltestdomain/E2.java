@@ -32,6 +32,21 @@ public class E2 implements TestEntity{
     @JoinColumn(name = "e1_id")
     private E1 e1;
 
+    @Action(semantics = SemanticsOf.IDEMPOTENT_ARE_YOU_SURE)
+    public E2 changeE1(final E1 e1){
+        setE1(e1);
+        return this;
+    }
+
+    public List<E1> choices0ChangeE1(){
+        return testEntityRepository.findAllE1().stream().filter(e->e!=getE1()).collect(Collectors.toList());
+    }
+
+    public String validateChangeE1(final E1 e1){
+        if (getE1() == e1) return "Already there";
+        return null;
+    }
+
     @OneToMany
     @Getter @Setter
     private List<E2> otherE2List = new ArrayList<>();
