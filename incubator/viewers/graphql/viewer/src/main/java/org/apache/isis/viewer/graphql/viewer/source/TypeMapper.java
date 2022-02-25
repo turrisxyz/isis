@@ -1,7 +1,6 @@
 package org.apache.isis.viewer.graphql.viewer.source;
 
 import graphql.Scalars;
-import graphql.com.google.common.collect.Lists;
 import graphql.schema.*;
 import org.apache.isis.core.metamodel.facets.actcoll.typeof.TypeOfFacet;
 import org.apache.isis.core.metamodel.spec.ObjectSpecification;
@@ -39,7 +38,7 @@ public class TypeMapper {
             case ENTITY:
             case VIEW_MODEL:
 
-                return GraphQLTypeReference.typeRef(Utils.logicalTypeNameSanitized(elementType.getLogicalTypeName()));
+                return GraphQLTypeReference.typeRef(Utils.GQL_INPUTTYPE_PREFIX + Utils.logicalTypeNameSanitized(elementType.getLogicalTypeName()));
 
             case VALUE:
                 return (GraphQLInputType) typeFor(elementType.getCorrespondingClass());

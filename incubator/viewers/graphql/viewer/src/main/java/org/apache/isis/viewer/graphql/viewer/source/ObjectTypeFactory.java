@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
+import static graphql.schema.GraphQLInputObjectType.newInputObject;
 import static graphql.schema.GraphQLObjectType.newObject;
 import static org.apache.isis.viewer.graphql.viewer.source.Utils.metaTypeName;
 import static org.apache.isis.viewer.graphql.viewer.source.Utils.mutatorsTypeName;
@@ -51,6 +52,12 @@ public class ObjectTypeFactory {
         // add meta field
         GraphQLFieldDefinition gql_meta = newFieldDefinition().name("_gql_meta").type(metaType).build();
         objectTypeBuilder.field(gql_meta);
+
+        // create input type
+        GraphQLInputObjectType.Builder inputTypeBuilder = newInputObject().name(Utils.GQL_INPUTTYPE_PREFIX + logicalTypeNameSanitized);
+        inputTypeBuilder.field(GraphQLInputObjectField.newInputObjectField().name("id").type(Scalars.GraphQLID).build());
+        GraphQLInputType inputType = inputTypeBuilder.build();
+        graphQLObjectTypes.add(inputType);
 
         // add fields
         addFields(objectSpecification, objectTypeBuilder);
@@ -201,7 +208,7 @@ public class ObjectTypeFactory {
         if (!mutatorFieldNames.isEmpty()){
             GraphQLObjectType mutatorsType = mutatorsTypeBuilder.build();
             graphQLObjectTypes.add(mutatorsType);
-            objectTypeBuilder.field(newFieldDefinition().name("_gql_mutators").type(mutatorsType).build());
+            objectTypeBuilder.field(newFieldDefinition().name(Utils.GQL_MUTATTIONS_FIELDNAME).type(mutatorsType).build());
         }
 
     }
