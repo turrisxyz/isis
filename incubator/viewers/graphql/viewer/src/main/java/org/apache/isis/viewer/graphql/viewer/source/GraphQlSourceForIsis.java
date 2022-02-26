@@ -71,10 +71,6 @@ public class GraphQlSourceForIsis implements GraphQlSource {
             switch (objectSpecification.getBeanSort()) {
 
                 case ABSTRACT:
-                    System.out.println(objectSpecification.getCorrespondingClass().getName());
-                    System.out.println(objectSpecification.getLogicalTypeName());
-                    // TODO: there seems to be a problem with logical type name not being unique
-
                 case VIEW_MODEL: // @DomainObject(nature=VIEW_MODEL)
                 case ENTITY:    // @DomainObject(nature=ENTITY)
 

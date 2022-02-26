@@ -18,7 +18,9 @@ import org.springframework.stereotype.Component;
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
@@ -54,10 +56,11 @@ public class ObjectTypeFactory {
         objectTypeBuilder.field(gql_meta);
 
         // create input type
-        GraphQLInputObjectType.Builder inputTypeBuilder = newInputObject().name(Utils.GQL_INPUTTYPE_PREFIX + logicalTypeNameSanitized);
+        String inputTypeName = Utils.GQL_INPUTTYPE_PREFIX + logicalTypeNameSanitized;
+        GraphQLInputObjectType.Builder inputTypeBuilder = newInputObject().name(inputTypeName);
         inputTypeBuilder.field(GraphQLInputObjectField.newInputObjectField().name("id").type(Scalars.GraphQLID).build());
         GraphQLInputType inputType = inputTypeBuilder.build();
-        graphQLObjectTypes.add(inputType);
+        addTypeIfNotAlreadyPresent(graphQLObjectTypes, inputType, inputTypeName);
 
         // add fields
         addFields(objectSpecification, objectTypeBuilder);
@@ -70,7 +73,7 @@ public class ObjectTypeFactory {
 
         // build and register object type
         GraphQLObjectType graphQLObjectType = objectTypeBuilder.build();
-        graphQLObjectTypes.add(graphQLObjectType);
+        addTypeIfNotAlreadyPresent(graphQLObjectTypes, graphQLObjectType, logicalTypeNameSanitized);
 
         // create and register data fetchers
         createAndRegisterDataFetchersForMetaData(codeRegistryBuilder, objectSpecificationBeanSort, metaType, gql_meta, graphQLObjectType);
@@ -78,6 +81,34 @@ public class ObjectTypeFactory {
         createAndRegisterDataFetchersForCollection(objectSpecification, codeRegistryBuilder, graphQLObjectType);
 
         return;
+    }
+
+    void addTypeIfNotAlreadyPresent(final Set<GraphQLType> graphQLObjectTypes, final GraphQLType typeToAdd, final String logicalTypeName){
+        boolean present;
+        if (typeToAdd.getClass().isAssignableFrom(GraphQLObjectType.class)){
+            GraphQLObjectType typeToAdd1 = (GraphQLObjectType) typeToAdd;
+            present = graphQLObjectTypes.stream()
+                    .filter(o -> o.getClass().isAssignableFrom(GraphQLObjectType.class))
+                    .map(GraphQLObjectType.class::cast)
+                    .filter(ot -> ot.getName().equals(typeToAdd1.getName()))
+                    .findFirst().isPresent();
+        } else {
+            // must be input type
+            GraphQLInputObjectType typeToAdd1 = (GraphQLInputObjectType) typeToAdd;
+            present = graphQLObjectTypes.stream()
+                    .filter(o -> o.getClass().isAssignableFrom(GraphQLInputObjectType.class))
+                    .map(GraphQLInputObjectType.class::cast)
+                    .filter(ot -> ot.getName().equals(typeToAdd1.getName()))
+                    .findFirst().isPresent();
+        }
+        if (present){
+            // For now we just log and skip
+            System.out.println("==== DOUBLE ====");
+            System.out.println(logicalTypeName);
+
+        } else {
+            graphQLObjectTypes.add(typeToAdd);
+        }
     }
 
     void addFields(ObjectSpecification objectSpecification, GraphQLObjectType.Builder objectTypeBuilder) {
@@ -207,7 +238,7 @@ public class ObjectTypeFactory {
 
         if (!mutatorFieldNames.isEmpty()){
             GraphQLObjectType mutatorsType = mutatorsTypeBuilder.build();
-            graphQLObjectTypes.add(mutatorsType);
+            addTypeIfNotAlreadyPresent(graphQLObjectTypes, mutatorsType, mutatorsTypeName);
             objectTypeBuilder.field(newFieldDefinition().name(Utils.GQL_MUTATTIONS_FIELDNAME).type(mutatorsType).build());
         }
 
@@ -255,7 +286,7 @@ public class ObjectTypeFactory {
             metaTypeBuilder.field(versionField);
         }
         GraphQLObjectType metaType = metaTypeBuilder.build();
-        graphQLObjectTypes.add(metaType);
+        addTypeIfNotAlreadyPresent(graphQLObjectTypes, metaType, logicalTypeNameSanitized);
         return metaType;
     }
 
