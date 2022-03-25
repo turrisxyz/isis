@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 import static graphql.schema.GraphQLInputObjectType.newInputObject;
+import static graphql.schema.GraphQLNonNull.nonNull;
 import static graphql.schema.GraphQLObjectType.newObject;
 import static org.apache.isis.viewer.graphql.viewer.source.Utils.metaTypeName;
 import static org.apache.isis.viewer.graphql.viewer.source.Utils.mutatorsTypeName;
@@ -36,8 +37,8 @@ public class ObjectTypeFactory {
     private final BookmarkService bookmarkService;
     private final SpecificationLoader specificationLoader;
 
-    private static GraphQLFieldDefinition idField = newFieldDefinition().name("id").type(Scalars.GraphQLString).build();
-    private static GraphQLFieldDefinition logicalTypeNameField = newFieldDefinition().name("logicalTypeName").type(Scalars.GraphQLString).build();
+    private static GraphQLFieldDefinition idField = newFieldDefinition().name("id").type(nonNull(Scalars.GraphQLString)).build();
+    private static GraphQLFieldDefinition logicalTypeNameField = newFieldDefinition().name("logicalTypeName").type(nonNull(Scalars.GraphQLString)).build();
     private static GraphQLFieldDefinition versionField = newFieldDefinition().name("version").type(Scalars.GraphQLString).build();
 
     public void objectTypeFromObjectSpecification(final ObjectSpecification objectSpecification, final Set<GraphQLType> graphQLObjectTypes, final GraphQLCodeRegistry.Builder codeRegistryBuilder) {
@@ -58,7 +59,7 @@ public class ObjectTypeFactory {
         // create input type
         String inputTypeName = Utils.GQL_INPUTTYPE_PREFIX + logicalTypeNameSanitized;
         GraphQLInputObjectType.Builder inputTypeBuilder = newInputObject().name(inputTypeName);
-        inputTypeBuilder.field(GraphQLInputObjectField.newInputObjectField().name("id").type(Scalars.GraphQLID).build());
+        inputTypeBuilder.field(GraphQLInputObjectField.newInputObjectField().name("id").type(nonNull(Scalars.GraphQLID)).build());
         GraphQLInputType inputType = inputTypeBuilder.build();
         addTypeIfNotAlreadyPresent(graphQLObjectTypes, inputType, inputTypeName);
 
@@ -124,7 +125,9 @@ public class ObjectTypeFactory {
 
                             String logicalTypeNameOfField = fieldObjectSpecification.getLogicalTypeName();
 
-                            GraphQLFieldDefinition.Builder fieldBuilder = newFieldDefinition().name(otoa.getId()).type(GraphQLTypeReference.typeRef(Utils.logicalTypeNameSanitized(logicalTypeNameOfField)));
+                            GraphQLFieldDefinition.Builder fieldBuilder = newFieldDefinition()
+                                    .name(otoa.getId())
+                                    .type(otoa.isOptional() ? GraphQLTypeReference.typeRef(Utils.logicalTypeNameSanitized(logicalTypeNameOfField)) : nonNull(GraphQLTypeReference.typeRef(Utils.logicalTypeNameSanitized(logicalTypeNameOfField))));
                             objectTypeBuilder.field(fieldBuilder);
 
                             break;
@@ -132,7 +135,8 @@ public class ObjectTypeFactory {
                         case VALUE:
 
                             // todo: map ...
-                            GraphQLFieldDefinition.Builder valueBuilder = newFieldDefinition().name(otoa.getId()).type(Scalars.GraphQLString);
+
+                            GraphQLFieldDefinition.Builder valueBuilder = newFieldDefinition().name(otoa.getId()).type(otoa.isOptional() ? Scalars.GraphQLString : nonNull(Scalars.GraphQLString));
                             objectTypeBuilder.field(valueBuilder);
 
                             break;
@@ -207,7 +211,7 @@ public class ObjectTypeFactory {
                             builder.arguments(objectAction.getParameters().stream()
                                     .map(objectActionParameter -> GraphQLArgument.newArgument()
                                             .name(objectActionParameter.getId())
-                                            .type(TypeMapper.inputTypeFor(objectActionParameter))
+                                            .type(objectActionParameter.isOptional() ? TypeMapper.inputTypeFor(objectActionParameter) : nonNull(TypeMapper.inputTypeFor(objectActionParameter)))
                                             .build())
                                     .collect(Collectors.toList()));
                         }
@@ -223,7 +227,7 @@ public class ObjectTypeFactory {
                             builder.arguments(objectAction.getParameters().stream()
                                     .map(objectActionParameter -> GraphQLArgument.newArgument()
                                             .name(objectActionParameter.getId())
-                                            .type(TypeMapper.inputTypeFor(objectActionParameter))
+                                            .type(objectActionParameter.isOptional() ? TypeMapper.inputTypeFor(objectActionParameter) : nonNull(TypeMapper.inputTypeFor(objectActionParameter)))
                                             .build())
                                     .collect(Collectors.toList()));
                         }
@@ -266,7 +270,7 @@ public class ObjectTypeFactory {
 
                     ManagedObject managedObject = otom.get(owner);
 
-                    return managedObject.getPojo();
+                    return managedObject!=null ? managedObject.getPojo() : null;
 
                 });
 

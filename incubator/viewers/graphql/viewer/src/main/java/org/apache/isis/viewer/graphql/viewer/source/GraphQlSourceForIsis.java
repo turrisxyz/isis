@@ -74,6 +74,7 @@ public class GraphQlSourceForIsis implements GraphQlSource {
                 case VIEW_MODEL: // @DomainObject(nature=VIEW_MODEL)
                 case ENTITY:    // @DomainObject(nature=ENTITY)
 
+                    // TODO: App interface should mapp to gql interfaces?
                     objectTypeFactory.objectTypeFromObjectSpecification(objectSpecification, graphQLObjectTypes, codeRegistryBuilder);
 
                     break;

@@ -8,17 +8,27 @@ import org.apache.isis.core.config.presets.IsisPresets;
 import org.apache.isis.core.metamodel.spec.ObjectSpecification;
 import org.apache.isis.core.metamodel.specloader.SpecificationLoader;
 import org.apache.isis.core.runtimeservices.IsisModuleCoreRuntimeServices;
+import org.apache.isis.persistence.jpa.eclipselink.IsisModulePersistenceJpaEclipselink;
 import org.apache.isis.security.bypass.IsisModuleSecurityBypass;
+import org.apache.isis.testing.fixtures.applib.IsisModuleTestingFixturesApplib;
 import org.apache.isis.viewer.graphql.viewer.IsisModuleIncViewerGraphqlViewer;
 import org.apache.isis.viewer.graphql.viewer.source.gqltestdomain.E1;
 import org.apache.isis.viewer.graphql.viewer.source.gqltestdomain.E2;
 import org.apache.isis.viewer.graphql.viewer.source.gqltestdomain.GQLTestDomainMenu;
+import org.apache.isis.viewer.graphql.viewer.source.gqltestdomain.TestDomainModule;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.context.annotation.PropertySources;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -26,18 +36,9 @@ import java.util.List;
 import static org.apache.isis.commons.internal.assertions._Assert.*;
 import static org.apache.isis.commons.internal.assertions._Assert.assertEquals;
 
-@SpringBootTest(
-        classes = {
-                IsisModuleCoreRuntimeServices.class,
-                IsisModuleSecurityBypass.class,
-                IsisModuleIncViewerGraphqlViewer.class,
-        })
-@TestPropertySource({
-        IsisPresets.SilenceMetaModel,
-        IsisPresets.SilenceProgrammingModel,
-//        IsisPresets.UseLog4j2Test,
-})
-public class GQLSchema_IntegTest {
+
+@Transactional
+public class GQLSchema_IntegTest extends TestDomainModuleIntegTestAbstract{
 
     @Inject
     private IsisSystemEnvironment isisSystemEnvironment;
@@ -62,6 +63,8 @@ public class GQLSchema_IntegTest {
 //        iocContainer.streamAllBeans().forEach(b->{
 //            System.out.println(b.getId());
 //        });
+
+        System.out.println(port);
 
         ObjectSpecification objectSpecification1 = specificationLoader.specForType(E1.class).get();
         assertNotNull(objectSpecification1);
