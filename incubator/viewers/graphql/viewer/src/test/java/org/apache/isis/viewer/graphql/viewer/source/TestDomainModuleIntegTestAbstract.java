@@ -57,4 +57,5 @@ public class TestDomainModuleIntegTestAbstract {
     @LocalServerPort
     protected int port;
 
+
 }
