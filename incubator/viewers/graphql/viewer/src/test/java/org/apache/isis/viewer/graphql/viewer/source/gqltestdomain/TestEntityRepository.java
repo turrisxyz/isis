@@ -18,7 +18,7 @@ public class TestEntityRepository {
         E1 e1 = new E1();
         e1.setName(name);
         e1.setE2(e2);
-        repository.persist(e1);
+        repository.persistAndFlush(e1);
         return e1;
     }
 
@@ -26,7 +26,7 @@ public class TestEntityRepository {
         E2 e2 = new E2();
         e2.setName(name);
         e2.setE1(e1);
-        repository.persist(e2);
+        repository.persistAndFlush(e2);
         return e2;
     }
 

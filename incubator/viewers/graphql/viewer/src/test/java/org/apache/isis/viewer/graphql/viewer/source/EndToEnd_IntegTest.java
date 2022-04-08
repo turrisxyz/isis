@@ -1,5 +1,7 @@
 package org.apache.isis.viewer.graphql.viewer.source;
 
+import org.apache.isis.applib.services.xactn.TransactionService;
+import org.apache.isis.commons.functional.ThrowingRunnable;
 import org.apache.isis.core.config.environment.IsisSystemEnvironment;
 import org.apache.isis.core.metamodel.specloader.SpecificationLoader;
 import org.apache.isis.viewer.graphql.viewer.source.gqltestdomain.E1;
@@ -12,6 +14,7 @@ import org.approvaltests.reporters.UseReporter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.inject.Inject;
@@ -24,12 +27,11 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static java.net.http.HttpRequest.BodyPublishers.ofFile;
-import static java.net.http.HttpRequest.BodyPublishers.ofString;
 import static org.apache.isis.commons.internal.assertions._Assert.assertNotNull;
 import static org.apache.isis.commons.internal.assertions._Assert.assertTrue;
 
 
-@Transactional
+//@Transactional
 public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
 
     @Inject
@@ -49,12 +51,6 @@ public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
         assertNotNull(isisSystemEnvironment);
         assertNotNull(specificationLoader);
         assertNotNull(graphQlSourceForIsis);
-        E1 foo = testEntityRepository.createE1("foo", null);
-        testEntityRepository.createE2("bar", foo);
-        List<E1> allE1 = testEntityRepository.findAllE1();
-        assertTrue(allE1.size()==1);
-        List<E2> allE2 = testEntityRepository.findAllE2();
-        assertTrue(allE2.size()==1);
     }
 
     @Test
@@ -84,12 +80,25 @@ public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
 
     }
 
+    @Inject
+    TransactionService transactionService;
+
     @Test
-    void why_does_this_return_empty_list() throws Exception {
+    @UseReporter(TextWebReporter.class)
+    void findAllE1() throws Exception {
 
         // given
-        List<E1> allE1 = testEntityRepository.findAllE1();
-        assertTrue(allE1.size()==1);
+        transactionService.runTransactional(Propagation.REQUIRED, () -> {
+            E1 foo = testEntityRepository.createE1("foo", null);
+            testEntityRepository.createE2("bar", foo);
+            transactionService.flushTransaction();
+            List<E1> allE1 = testEntityRepository.findAllE1();
+            assertTrue(allE1.size()==1);
+            List<E2> allE2 = testEntityRepository.findAllE2();
+            assertTrue(allE2.size()==1);
+        });
+
+
 
         // when
         File body2 = new File("src/test/resources/testfiles/body2.gql");
@@ -99,7 +108,7 @@ public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
         File targetFile3 = new File("src/test/resources/testfiles/targetFile3.gql");
         HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(targetFile3.toPath()));
 
-//        Approvals.verify(targetFile3, new Options());
+        Approvals.verify(targetFile3, new Options());
 
     }
 
