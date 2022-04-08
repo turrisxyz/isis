@@ -12,13 +12,13 @@ import java.util.List;
 public class TestEntityRepository {
 
     @Inject
-    private RepositoryService repository;
+    private RepositoryService repositoryService;
 
     public E1 createE1(final String name, @Nullable final E2 e2) {
         E1 e1 = new E1();
         e1.setName(name);
         e1.setE2(e2);
-        repository.persistAndFlush(e1);
+        repositoryService.persistAndFlush(e1);
         return e1;
     }
 
@@ -26,16 +26,16 @@ public class TestEntityRepository {
         E2 e2 = new E2();
         e2.setName(name);
         e2.setE1(e1);
-        repository.persistAndFlush(e2);
+        repositoryService.persistAndFlush(e2);
         return e2;
     }
 
     public List<E1> findAllE1() {
-        return repository.allInstances(E1.class);
+        return repositoryService.allInstances(E1.class);
     }
 
     public List<E2> findAllE2() {
-        return repository.allInstances(E2.class);
+        return repositoryService.allInstances(E2.class);
     }
 
     public List<TestEntity> findAllTestEntities() {
@@ -43,6 +43,11 @@ public class TestEntityRepository {
         result.addAll(findAllE1());
         result.addAll(findAllE2());
         return result;
+    }
+
+    public void removeAll(){
+        repositoryService.removeAll(E1.class);
+        repositoryService.removeAll(E2.class);
     }
 
 }

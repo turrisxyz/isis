@@ -42,7 +42,7 @@ public class QueryFieldFactory {
                     List<ObjectAction> objectActionList = objectSpecification.streamRuntimeActions(MixedIn.INCLUDED)
                             .map(ObjectAction.class::cast)
                             .filter((ObjectAction x) -> x.containsFacet(ActionSemanticsFacet.class))
-                            .filter(x -> x.getFacet(ActionSemanticsFacet.class).value() == SemanticsOf.SAFE)
+//                            .filter(x -> x.getFacet(ActionSemanticsFacet.class).value() == SemanticsOf.SAFE)
                             .collect(Collectors.toList());
 
                     // for now filters when no safe actions
@@ -106,7 +106,7 @@ public class QueryFieldFactory {
 
                                                     }).collect(Can.toCan());
 
-                                                    ManagedObject managedObject = objectAction.execute(actionInteractionHead, canOfParams, InteractionInitiatedBy.USER);
+                                                        ManagedObject managedObject = objectAction.execute(actionInteractionHead, canOfParams, InteractionInitiatedBy.USER);
 
                                                     return managedObject.getPojo();
                                                 }

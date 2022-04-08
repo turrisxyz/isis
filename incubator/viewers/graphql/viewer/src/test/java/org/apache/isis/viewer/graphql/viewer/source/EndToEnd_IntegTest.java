@@ -11,6 +11,7 @@ import org.approvaltests.Approvals;
 import org.approvaltests.core.Options;
 import org.approvaltests.reporters.TextWebReporter;
 import org.approvaltests.reporters.UseReporter;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -24,14 +25,14 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.net.http.HttpRequest.BodyPublishers.ofFile;
-import static org.apache.isis.commons.internal.assertions._Assert.assertNotNull;
-import static org.apache.isis.commons.internal.assertions._Assert.assertTrue;
+import static org.apache.isis.commons.internal.assertions._Assert.*;
 
 
-//@Transactional
+//@Transactional NOT USING @Transactional since we are running server within same transaction otherwise
 public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
 
     @Inject
@@ -51,6 +52,13 @@ public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
         assertNotNull(isisSystemEnvironment);
         assertNotNull(specificationLoader);
         assertNotNull(graphQlSourceForIsis);
+    }
+
+    @AfterEach
+    void afterEach(){
+        transactionService.runTransactional(Propagation.REQUIRED, () -> {
+            testEntityRepository.removeAll();
+        });
     }
 
     @Test
@@ -73,10 +81,10 @@ public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
         HttpClient client = HttpClient.newBuilder().build();
         URI uri = URI.create("http://0.0.0.0:" + port + "/graphql");
         HttpRequest request = HttpRequest.newBuilder().uri(uri).POST(ofFile(body1.toPath())).setHeader("Content-Type", "application/json").build();
-        File targetFile2 = new File("src/test/resources/testfiles/targetFile2.gql");
-        HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(targetFile2.toPath()));
+        File targetFile1 = new File("src/test/resources/testfiles/targetFile1.gql");
+        HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(targetFile1.toPath()));
 
-        Approvals.verify(targetFile2, new Options());
+        Approvals.verify(targetFile1, new Options());
 
     }
 
@@ -90,7 +98,7 @@ public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
         // given
         transactionService.runTransactional(Propagation.REQUIRED, () -> {
             E1 foo = testEntityRepository.createE1("foo", null);
-            testEntityRepository.createE2("bar", foo);
+            testEntityRepository.createE2("bar", null);
             transactionService.flushTransaction();
             List<E1> allE1 = testEntityRepository.findAllE1();
             assertTrue(allE1.size()==1);
@@ -98,16 +106,47 @@ public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
             assertTrue(allE2.size()==1);
         });
 
-
-
         // when
         File body2 = new File("src/test/resources/testfiles/body2.gql");
         HttpClient client = HttpClient.newBuilder().build();
         URI uri = URI.create("http://0.0.0.0:" + port + "/graphql");
         HttpRequest request = HttpRequest.newBuilder().uri(uri).POST(ofFile(body2.toPath())).setHeader("Content-Type", "application/json").build();
-        File targetFile3 = new File("src/test/resources/testfiles/targetFile3.gql");
-        HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(targetFile3.toPath()));
+        File targetFile2 = new File("src/test/resources/testfiles/targetFile2.gql");
+        HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(targetFile2.toPath()));
 
+        Approvals.verify(targetFile2, new Options());
+
+    }
+
+    @Test
+    @UseReporter(TextWebReporter.class)
+    void createE1() throws Exception {
+
+        File body3 = new File("src/test/resources/testfiles/body3.gql");
+        HttpClient client = HttpClient.newBuilder().build();
+        URI uri = URI.create("http://0.0.0.0:" + port + "/graphql");
+        HttpRequest request = HttpRequest.newBuilder().uri(uri).POST(ofFile(body3.toPath())).setHeader("Content-Type", "application/json").build();
+        File targetFile3 = new File("src/test/resources/testfiles/targetFile3.gql");
+
+        transactionService.runTransactional(Propagation.REQUIRED, () -> {
+
+            HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(targetFile3.toPath()));
+            // just to show we need to query in separate tranasction
+            List<E2> list = testEntityRepository.findAllE2();
+            assertTrue(list.isEmpty());
+
+        });
+
+        final List<E1> allE1 = new ArrayList<>();
+        transactionService.runTransactional(Propagation.REQUIRED, () -> {
+
+            List<E1> all = testEntityRepository.findAllE1();
+            allE1.addAll(all);
+
+        });
+
+        assertEquals(1, allE1.size());
+        assertEquals("newbee", allE1.get(0).getName());
         Approvals.verify(targetFile3, new Options());
 
     }

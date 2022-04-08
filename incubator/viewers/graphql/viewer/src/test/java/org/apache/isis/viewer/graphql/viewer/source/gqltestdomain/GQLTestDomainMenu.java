@@ -20,6 +20,7 @@ package org.apache.isis.viewer.graphql.viewer.source.gqltestdomain;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.isis.applib.annotation.*;
+import org.springframework.lang.Nullable;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -31,6 +32,11 @@ import java.util.List;
 @javax.annotation.Priority(PriorityPrecedence.EARLY)
 @RequiredArgsConstructor(onConstructor_ = {@Inject})
 public class GQLTestDomainMenu {
+
+    @Action(semantics = SemanticsOf.NON_IDEMPOTENT)
+    public E1 createE1(final String name, @Nullable final E2 e2){
+        return testEntityRepository.createE1(name, e2);
+    }
 
     @Action(semantics = SemanticsOf.SAFE)
     public List<E1> findAllE1(){
