@@ -48,20 +48,6 @@ public class EndToEnd_IntegTest extends TestDomainModuleIntegTestAbstract{
 
     @Test
     @UseReporter(TextWebReporter.class)
-    void print_schema_works() throws Exception {
-
-        HttpClient client = HttpClient.newBuilder().build();
-        URI uri = URI.create("http://0.0.0.0:" + port + "/graphql/schema");
-        HttpRequest request = HttpRequest.newBuilder().uri(uri).GET().build();
-        File targetFile1 = new File("src/test/resources/testfiles/targetFile1.gql");
-        HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(targetFile1.toPath()));
-
-        Approvals.verify(targetFile1, new Options());
-
-    }
-
-    @Test
-    @UseReporter(TextWebReporter.class)
     void simple_post_request() throws Exception {
 
         File body1 = new File("src/test/resources/testfiles/body1.gql");

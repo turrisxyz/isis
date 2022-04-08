@@ -136,12 +136,6 @@ public class GQLSchema_IntegTest extends TestDomainModuleIntegTestAbstract{
         GraphQLFieldDefinition graphQLFieldDefinition = mutationType.getFields().get(0);
         assertEquals("changeE1",graphQLFieldDefinition.getName());
         GraphQLArgument mutatorArgument = graphQLFieldDefinition.getArgument("e1");
-        GraphQLInputObjectType mutatorArgumentType = (GraphQLInputObjectType) mutatorArgument.getType();
-        assertEquals("_gql_input__gqltestdomain_E1", mutatorArgumentType.getName());
-        assertEquals(1, mutatorArgumentType.getFields().size());
-        assertEquals("id", mutatorArgumentType.getFields().get(0).getName());
-        GraphQLObjectType mutatorReturnType = (GraphQLObjectType) graphQLFieldDefinition.getType();
-        assertEquals("gqltestdomain_E2", mutatorReturnType.getName());
 
         GraphQLType gqltestdomain_e1__domainObject_meta = graphQLSchema.getType("gqltestdomain_E1__DomainObject_meta");
         List<GraphQLSchemaElement> children1 = gqltestdomain_e1__domainObject_meta.getChildren();
